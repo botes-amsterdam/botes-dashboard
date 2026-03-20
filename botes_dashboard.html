@@ -348,7 +348,7 @@ function buildZoneBars(data) {
 
 function buildOmzetJaarChart(data, jaren) {
   const maanden = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
-  const jaarKleuren = ['#C9956B','#8B5E3C','#E8D5C4','#D4A88A','#6B3E2C','#F0C4A0'];
+  const jaarKleuren = ['#B8A9D4','#A8C9A0','#F2C4CE','#A8C4D4','#D4B8A0','#C4D4A8'];
   const datasets = jaren.map((j, i) => {
     const perMaand = Array(12).fill(0);
     data.filter(r => getYear(r) === j).forEach(r => {
@@ -386,7 +386,7 @@ function buildOmzetJaarChart(data, jaren) {
 
 function buildBehandelingenJaarChart(data, jaren) {
   const maanden = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
-  const jaarKleuren = ['#C9956B','#8B5E3C','#E8D5C4','#D4A88A','#6B3E2C','#F0C4A0'];
+  const jaarKleuren = ['#B8A9D4','#A8C9A0','#F2C4CE','#A8C4D4','#D4B8A0','#C4D4A8'];
   const datasets = jaren.map((j, i) => {
     const perMaand = Array(12).fill(0);
     data.filter(r => getYear(r) === j).forEach(r => {
