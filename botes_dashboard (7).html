@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Botes — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --cream: #F7F3EE; --warm: #EDE6DC; --blush: #E8D5C4;
+    --rose: #C9956B; --deep: #8B5E3C; --dark: #2C1810;
+    --text: #3D2B1F; --muted: #9B8478; --card: #FFFAF6;
+    --border: rgba(139,94,60,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem 4rem; }
+  header { padding: 3rem 0 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2.5rem; }
+  .header-inner { display: flex; justify-content: space-between; align-items: flex-end; }
+  .brand-name { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 500; color: var(--dark); }
+  .brand-sub { font-size: 13px; color: var(--muted); font-weight: 300; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 4px; }
+  .last-updated { font-size: 12px; color: var(--muted); text-align: right; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rose); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 1rem; }
+  .loading-ring { width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--blush); border-top-color: var(--rose); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { font-size: 14px; color: var(--muted); }
+  .dashboard { display: none; }
+  .dashboard.visible { display: block; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 500; color: var(--dark); margin-bottom: 4px; margin-top: 2.5rem; }
+  .section-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 1.5rem; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+  .kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(139,94,60,0.1); }
+  .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--rose), var(--blush)); }
+  .kpi-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .kpi-value { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 500; color: var(--dark); line-height: 1; }
+  .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .kpi-groei { color: #6B9E6B; }
+  .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid2b { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 0; }
+  .card-full { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin-bottom: 16px; }
+  .card-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 500; color: var(--dark); margin-bottom: 1.25rem; }
+  .chart-wrap { position: relative; width: 100%; }
+  .year-tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .year-tab { padding: 4px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .year-tab.active { background: var(--rose); color: white; border-color: var(--rose); }
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-item { display: flex; flex-direction: column; gap: 4px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 12px; }
+  .bar-name { color: var(--text); }
+  .bar-val { color: var(--rose); font-weight: 500; }
+  .bar-track { height: 6px; background: var(--warm); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--rose), var(--blush)); border-radius: 3px; }
+  .forecast-note { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 12px; }
+  footer { margin-top: 3rem; padding: 1.5rem 0; border-top: 1px solid var(--border); text-align: center; font-size: 12px; color: var(--muted); }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .error { text-align: center; padding: 3rem; color: var(--muted); }
+  .error h3 { font-family: 'Playfair Display', serif; color: var(--dark); margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div>
+        <div class="brand-name">Botes</div>
+        <div class="brand-sub">Behandelingen dashboard</div>
+      </div>
+      <div class="last-updated"><span class="dot"></span><span id="update-time">Laden...</span></div>
+    </div>
+  </header>
+
+  <div class="loading" id="loading">
+    <div class="loading-ring"></div>
+    <p>Data ophalen uit Google Sheets...</p>
+  </div>
+
+  <div class="dashboard" id="dashboard">
+
+    <!-- KPI's -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Totale omzet</div><div class="kpi-value" id="kpi-omzet">—</div><div class="kpi-sub" id="kpi-omzet-sub"></div></div>
+      <div class="kpi"><div class="kpi-label">Behandelingen totaal</div><div class="kpi-value" id="kpi-beh">—</div><div class="kpi-sub" id="kpi-beh-sub"></div></div>
+      <div class="kpi"><div class="kpi-label">Gem. per behandeling</div><div class="kpi-value" id="kpi-gem">—</div><div class="kpi-sub">vraagprijs gemiddeld</div></div>
+      <div class="kpi"><div class="kpi-label">Actieve locaties</div><div class="kpi-value" id="kpi-loc">—</div><div class="kpi-sub" id="kpi-loc-sub"></div></div>
+    </div>
+
+    <!-- Omzet + locatie -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Omzet per maand</div>
+        <div class="year-tabs" id="year-tabs"></div>
+        <div class="chart-wrap" style="height:240px"><canvas id="omzetChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Omzet per locatie</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="locatieChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Zones, merken, aantallen -->
+    <div class="grid3" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title">Meest geboekte zones</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="zoneChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Merk injectable</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="typeChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Behandelingen per jaar</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="countChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Zone balken + maand lijn -->
+    <div class="grid2b" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title">Top 10 zones</div>
+        <div class="bar-list" id="zone-bars"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Behandelingen per maand (alle jaren)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="maandChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Jaar lijnen omzet -->
+    <div class="card-full" style="margin-top:16px">
+      <div class="card-title">Omzet per maand per jaar</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="omzetJaarChart"></canvas></div>
+    </div>
+
+    <!-- Jaar lijnen behandelingen -->
+    <div class="card-full">
+      <div class="card-title">Behandelingen per maand per jaar</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="behJaarChart"></canvas></div>
+    </div>
+
+    <!-- Toekomst -->
+    <div class="section-title">Toekomstverwachting</div>
+    <div class="section-sub">Berekend op basis van historische groeitrend — ter indicatie</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Verwachte omzet 2026</div><div class="kpi-value" id="pred-omzet">—</div><div class="kpi-sub" id="pred-omzet-sub"></div></div>
+      <div class="kpi"><div class="kpi-label">Verwacht behandelingen 2026</div><div class="kpi-value" id="pred-beh">—</div><div class="kpi-sub">geschatte behandelingen</div></div>
+      <div class="kpi"><div class="kpi-label">Groei t.o.v. 2025</div><div class="kpi-value kpi-groei" id="pred-groei">—</div><div class="kpi-sub">omzet verwachting</div></div>
+      <div class="kpi"><div class="kpi-label">Gem. maandomzet 2026</div><div class="kpi-value" id="pred-maand">—</div><div class="kpi-sub">verwacht</div></div>
+    </div>
+
+    <div class="card-full">
+      <div class="card-title">Omzet historisch + voorspelling</div>
+      <div class="chart-wrap" style="height:300px"><canvas id="forecastChart"></canvas></div>
+      <div class="forecast-note">Voorspelling gebaseerd op lineaire trendberekening van historische jaaromzet</div>
+    </div>
+
+  </div>
+
+  <div id="error-msg" style="display:none" class="error">
+    <h3>Data kon niet worden geladen</h3>
+    <p>Controleer of het Google Sheet publiek toegankelijk is (Viewer).</p>
+  </div>
+
+  <footer>Botes dashboard &mdash; alleen zakelijke data, geen persoonsgegevens</footer>
+</div>
+
+<script>
+const SHEET_ID = '166Pfm4CCpYvRVGO2FsGOBfHke1VT8mNb3Q2rtZlCHoQ';
+const GID = '2025121479';
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/export?format=csv&gid=' + GID;
+const PASTEL = ['#B8A9D4','#A8C9A0','#F2C4CE','#A8C4D4','#D4C4A0','#C4D4A8','#D4A8C4','#A8C4C4'];
+const WARM_COLORS = ['#C9956B','#E8D5C4','#8B5E3C','#D4A88A','#EDE6DC','#B07850'];
+const MUTED = '#9B8478';
+let allData = [], omzetInst = null;
+
+const fmt = n => '€' + Math.round(n).toLocaleString('nl-NL');
+
+function splitLine(line) {
+  const res = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === ',' && !inQ) { res.push(cur.trim()); cur = ''; continue; }
+    cur += c;
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const headers = splitLine(lines[0]);
+  return lines.slice(1).filter(l => l.trim()).map(l => {
+    const vals = splitLine(l);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+function getYear(r) {
+  const m = (r['Behandeldatum'] || '').match(/\b(20\d{2})\b/);
+  return m ? m[1] : null;
+}
+
+function getMonth(r) {
+  const parts = (r['Behandeldatum'] || '').split('/');
+  if (parts.length >= 3) { const m = parseInt(parts[0]); if (m >= 1 && m <= 12) return m; }
+  return null;
+}
+
+function getPrice(r) {
+  const v = (r['Vraagprijs'] || '0').replace(/[^0-9,.]/g, '').replace(',', '.');
+  return parseFloat(v) || 0;
+}
+
+function getLocatie(r) {
+  for (const k of Object.keys(r)) { if (k.toLowerCase().trim() === 'locatie') return r[k]; }
+  return '';
+}
+
+function getZone(r) {
+  for (const k of Object.keys(r)) { if (k.toLowerCase().includes('behandelgebied')) return r[k]; }
+  return '';
+}
+
+function getType(r) {
+  for (const k of Object.keys(r)) { if (k.toLowerCase().includes('merk')) return r[k]; }
+  return '';
+}
+
+function valid(data) {
+  return data.filter(r => { const y = getYear(r); return y && /^20\d{2}$/.test(y); });
+}
+
+function buildDashboard(data) {
+  allData = data;
+  const d = valid(data);
+  const jaren = [...new Set(d.map(r => getYear(r)))].sort();
+  const locaties = [...new Set(d.map(r => getLocatie(r)).filter(Boolean))];
+  const totalOmzet = d.reduce((s, r) => s + getPrice(r), 0);
+  const total = d.length;
+
+  document.getElementById('kpi-omzet').textContent = fmt(totalOmzet);
+  document.getElementById('kpi-omzet-sub').textContent = (jaren[0] || '') + ' – ' + (jaren[jaren.length-1] || '');
+  document.getElementById('kpi-beh').textContent = total.toLocaleString('nl-NL');
+  document.getElementById('kpi-beh-sub').textContent = jaren.length + ' jaar data';
+  document.getElementById('kpi-gem').textContent = fmt(total ? totalOmzet / total : 0);
+  document.getElementById('kpi-loc').textContent = locaties.length || '—';
+  document.getElementById('kpi-loc-sub').textContent = locaties.slice(0, 2).join(', ');
+
+  buildJaarTabs(d, jaren);
+  buildLocChart(d, locaties);
+  buildZonePie(d);
+  buildTypePie(d);
+  buildCountChart(d, jaren);
+  buildZoneBars(d);
+  buildMaandLine(d);
+  buildOmzetJaar(d, jaren);
+  buildBehJaar(d, jaren);
+  buildForecast(d, jaren);
+
+  document.getElementById('update-time').textContent = 'Bijgewerkt: ' + new Date().toLocaleDateString('nl-NL');
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('dashboard').classList.add('visible');
+}
+
+function buildJaarTabs(data, jaren) {
+  const el = document.getElementById('year-tabs');
+  el.innerHTML = '<button class="year-tab active" onclick="filterJaar(\'all\',this)">Alle jaren</button>' +
+    jaren.map(j => '<button class="year-tab" onclick="filterJaar(\'' + j + '\',this)">' + j + '</button>').join('');
+  renderOmzetBar(data);
+}
+
+function filterJaar(jaar, btn) {
+  document.querySelectorAll('.year-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const d = jaar === 'all' ? valid(allData) : valid(allData).filter(r => getYear(r) === jaar);
+  renderOmzetBar(d);
+}
+
+function renderOmzetBar(data) {
+  const mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const pm = Array(12).fill(0);
+  data.forEach(r => { const m = getMonth(r); if (m) pm[m-1] += getPrice(r); });
+  if (omzetInst) omzetInst.destroy();
+  omzetInst = new Chart(document.getElementById('omzetChart'), {
+    type: 'bar',
+    data: { labels: mnd, datasets: [{ data: pm, backgroundColor: pm.map(v => v > 0 ? '#C9956B' : '#EDE6DC'), borderRadius: 6, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.raw) } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 11 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 }, callback: v => '€' + (v/1000).toFixed(0) + 'k' } } } }
+  });
+}
+
+function buildLocChart(data, locaties) {
+  if (!locaties.length) return;
+  const perLoc = locaties.map(l => data.filter(r => getLocatie(r) === l).reduce((s, r) => s + getPrice(r), 0));
+  new Chart(document.getElementById('locatieChart'), {
+    type: 'doughnut',
+    data: { labels: locaties.map(l => l.length > 22 ? l.substring(0,22)+'…' : l), datasets: [{ data: perLoc, backgroundColor: WARM_COLORS, borderWidth: 0, hoverOffset: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: MUTED, font: { size: 11 }, padding: 10, boxWidth: 10 } }, tooltip: { callbacks: { label: c => ' ' + fmt(c.raw) } } }, cutout: '60%' }
+  });
+}
+
+function buildZonePie(data) {
+  const t = {}; data.forEach(r => { const z = getZone(r); if (z) t[z] = (t[z]||0) + 1; });
+  const e = Object.entries(t).sort((a,b) => b[1]-a[1]).slice(0,8);
+  new Chart(document.getElementById('zoneChart'), {
+    type: 'doughnut',
+    data: { labels: e.map(x => x[0].length > 18 ? x[0].substring(0,18)+'…' : x[0]), datasets: [{ data: e.map(x => x[1]), backgroundColor: PASTEL, borderWidth: 0, hoverOffset: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: MUTED, font: { size: 10 }, padding: 8, boxWidth: 10 } }, tooltip: { callbacks: { label: c => ' ' + c.raw + 'x' } } }, cutout: '55%' }
+  });
+}
+
+function buildTypePie(data) {
+  const t = {}; data.forEach(r => { const x = getType(r); if (x) t[x] = (t[x]||0) + 1; });
+  const e = Object.entries(t).sort((a,b) => b[1]-a[1]);
+  new Chart(document.getElementById('typeChart'), {
+    type: 'doughnut',
+    data: { labels: e.map(x => x[0]), datasets: [{ data: e.map(x => x[1]), backgroundColor: PASTEL, borderWidth: 0, hoverOffset: 8 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: MUTED, font: { size: 11 }, padding: 10, boxWidth: 10 } }, tooltip: { callbacks: { label: c => ' ' + c.raw + ' behandelingen' } } }, cutout: '60%' }
+  });
+}
+
+function buildCountChart(data, jaren) {
+  const pj = jaren.map(j => data.filter(r => getYear(r) === j).length);
+  new Chart(document.getElementById('countChart'), {
+    type: 'bar',
+    data: { labels: jaren, datasets: [{ data: pj, backgroundColor: '#E8D5C4', borderRadius: 6, borderSkipped: false, hoverBackgroundColor: '#C9956B' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + c.raw + ' behandelingen' } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 11 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 } } } } }
+  });
+}
+
+function buildZoneBars(data) {
+  const t = {}; data.forEach(r => { const z = getZone(r); if (z) t[z] = (t[z]||0) + 1; });
+  const s = Object.entries(t).sort((a,b) => b[1]-a[1]).slice(0,10);
+  const max = s[0]?.[1] || 1;
+  document.getElementById('zone-bars').innerHTML = s.map(([n,c]) =>
+    '<div class="bar-item"><div class="bar-label"><span class="bar-name">' + n + '</span><span class="bar-val">' + c + 'x</span></div><div class="bar-track"><div class="bar-fill" style="width:' + Math.round(c/max*100) + '%"></div></div></div>'
+  ).join('');
+}
+
+function buildMaandLine(data) {
+  const mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const pm = Array(12).fill(0);
+  data.forEach(r => { const m = getMonth(r); if (m) pm[m-1]++; });
+  new Chart(document.getElementById('maandChart'), {
+    type: 'line',
+    data: { labels: mnd, datasets: [{ data: pm, borderColor: '#C9956B', backgroundColor: 'rgba(201,149,107,0.08)', borderWidth: 2, pointBackgroundColor: '#C9956B', pointRadius: 4, tension: 0.4, fill: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + c.raw + ' behandelingen' } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 11 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 } } } } }
+  });
+}
+
+function buildOmzetJaar(data, jaren) {
+  const mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const datasets = jaren.map((j, i) => {
+    const pm = Array(12).fill(0);
+    data.filter(r => getYear(r) === j).forEach(r => { const m = getMonth(r); if (m) pm[m-1] += getPrice(r); });
+    return { label: j, data: pm, borderColor: PASTEL[i % PASTEL.length], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: PASTEL[i % PASTEL.length], tension: 0.4 };
+  });
+  new Chart(document.getElementById('omzetJaarChart'), {
+    type: 'line', data: { labels: mnd, datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: MUTED, font: { size: 12 }, padding: 16, boxWidth: 12 } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 11 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 }, callback: v => '€' + (v/1000).toFixed(0) + 'k' } } } }
+  });
+}
+
+function buildBehJaar(data, jaren) {
+  const mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const datasets = jaren.map((j, i) => {
+    const pm = Array(12).fill(0);
+    data.filter(r => getYear(r) === j).forEach(r => { const m = getMonth(r); if (m) pm[m-1]++; });
+    return { label: j, data: pm, borderColor: PASTEL[i % PASTEL.length], backgroundColor: 'transparent', borderWidth: 2, pointRadius: 3, pointBackgroundColor: PASTEL[i % PASTEL.length], tension: 0.4 };
+  });
+  new Chart(document.getElementById('behJaarChart'), {
+    type: 'line', data: { labels: mnd, datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: MUTED, font: { size: 12 }, padding: 16, boxWidth: 12 } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + c.raw + ' behandelingen' } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 11 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 } } } } }
+  });
+}
+
+function buildForecast(data, jaren) {
+  const huidig = new Date().getFullYear().toString();
+  const volleJaren = jaren.filter(j => j !== huidig);
+  if (volleJaren.length < 2) return;
+
+  const jaarOmzet = {}, jaarBeh = {};
+  jaren.forEach(j => {
+    const rows = data.filter(r => getYear(r) === j);
+    jaarOmzet[j] = rows.reduce((s,r) => s + getPrice(r), 0);
+    jaarBeh[j] = rows.length;
+  });
+
+  const n = volleJaren.length;
+  const xs = volleJaren.map((_, i) => i);
+  const ys = volleJaren.map(j => jaarOmzet[j]);
+  const xm = xs.reduce((a,b) => a+b,0) / n;
+  const ym = ys.reduce((a,b) => a+b,0) / n;
+  const slope = xs.reduce((s,x,i) => s + (x-xm)*(ys[i]-ym), 0) / xs.reduce((s,x) => s + (x-xm)**2, 0);
+  const intercept = ym - slope * xm;
+  const pred2026 = Math.max(0, intercept + slope * n);
+  const pred2027 = Math.max(0, intercept + slope * (n+1));
+
+  const ysBeh = volleJaren.map(j => jaarBeh[j]);
+  const ymB = ysBeh.reduce((a,b) => a+b,0) / n;
+  const slopeB = xs.reduce((s,x,i) => s + (x-xm)*(ysBeh[i]-ymB), 0) / xs.reduce((s,x) => s + (x-xm)**2, 0);
+  const predBeh = Math.max(0, Math.round(ymB - slopeB * xm + slopeB * n));
+
+  const omzet2025 = jaarOmzet['2025'] || 0;
+  const groei = omzet2025 ? ((pred2026 - omzet2025) / omzet2025 * 100) : 0;
+
+  document.getElementById('pred-omzet').textContent = fmt(pred2026);
+  document.getElementById('pred-omzet-sub').textContent = 'op basis van ' + n + ' jaar data';
+  document.getElementById('pred-beh').textContent = predBeh.toLocaleString('nl-NL');
+  document.getElementById('pred-groei').textContent = (groei >= 0 ? '+' : '') + Math.round(groei) + '%';
+  document.getElementById('pred-maand').textContent = fmt(pred2026 / 12);
+
+  const alleJaren = [...volleJaren, huidig, '2027'];
+  new Chart(document.getElementById('forecastChart'), {
+    type: 'bar',
+    data: {
+      labels: alleJaren,
+      datasets: [
+        { label: 'Historische omzet', data: alleJaren.map(j => volleJaren.includes(j) ? jaarOmzet[j] : null), backgroundColor: '#C9956B', borderRadius: 6, borderSkipped: false, order: 2 },
+        { label: 'Huidig jaar', data: alleJaren.map(j => j === huidig ? (jaarOmzet[j] || 0) : null), backgroundColor: '#E8D5C4', borderRadius: 6, borderSkipped: false, order: 2 },
+        { label: 'Voorspelling', data: alleJaren.map(j => j === huidig ? pred2026 : j === '2027' ? pred2027 : null), type: 'line', borderColor: '#B8A9D4', backgroundColor: 'rgba(184,169,212,0.1)', borderWidth: 2, borderDash: [6,4], pointBackgroundColor: '#B8A9D4', pointRadius: 5, tension: 0.3, fill: false, order: 1 }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: MUTED, font: { size: 12 }, padding: 16, boxWidth: 12 } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw || 0) } } }, scales: { x: { grid: { display: false }, ticks: { color: MUTED, font: { size: 12 } } }, y: { grid: { color: 'rgba(139,94,60,0.06)' }, ticks: { color: MUTED, font: { size: 11 }, callback: v => '€' + (v/1000).toFixed(0) + 'k' } } } }
+  });
+}
+
+async function loadData() {
+  try {
+    const res = await fetch(CSV_URL);
+    if (!res.ok) throw new Error('Fetch failed');
+    const text = await res.text();
+    const data = parseCSV(text);
+    if (!data.length) throw new Error('Leeg');
+    buildDashboard(data);
+  } catch(e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'block';
+    console.error(e);
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
